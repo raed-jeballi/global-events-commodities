@@ -26,10 +26,10 @@ This project simulates a **real-world data engineering workflow**, including raw
 ---
 
 ## High-Level Pipeline
-```
+
 ![High-Level Pipeline Architecture](docs/architecture.png)
 
-```
+
 - Data is collected hourly using **incremental fetching** to avoid duplicates.
 - Raw data is stored first, then transformed using **dbt models**.
 - Final insights include the effect of global events on commodity prices.
