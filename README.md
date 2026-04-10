@@ -70,7 +70,7 @@ Power BI Dashboard (visual insights)
 ## Getting Started
 1. Clone the repository:  
    ```bash
-   git clone https://github.com/yourusername/global-events-commodities.git
+   git clone git clone https://github.com/raed-jeballi/global-events-commodities.git
    ```
 2. Set up Python environment:  
    ```bash
