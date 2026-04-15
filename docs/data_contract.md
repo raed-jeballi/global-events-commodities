@@ -1,5 +1,5 @@
 # Data Contract For All Sources
---
+
 ## 📌 1. GDELT (Global Database of Events, Language, and Tone)
 - ** **
 - **Endpoint URL:** https://api.gdeltproject.org/api/v2/doc/doc (for the v2 Textual Analysis API; other endpoints exist for the event database)
