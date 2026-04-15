@@ -26,17 +26,10 @@ This project simulates a **real-world data engineering workflow**, including raw
 ---
 
 ## High-Level Pipeline
-```
-Data Sources (GDELT, NewsAPI → events; Alpha Vantage, Yahoo Finance → prices)
-        ↓
-Raw Tables (stored in warehouse)
-        ↓
-dbt Transformations (staging → fact tables)
-        ↓
-Fact Tables (aggregated and cleaned data)
-        ↓
-Power BI Dashboard (visual insights)
-```
+
+![High-Level Pipeline Architecture](docs/architecture.png)
+
+
 - Data is collected hourly using **incremental fetching** to avoid duplicates.
 - Raw data is stored first, then transformed using **dbt models**.
 - Final insights include the effect of global events on commodity prices.
