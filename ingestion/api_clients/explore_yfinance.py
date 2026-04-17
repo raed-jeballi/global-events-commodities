@@ -16,6 +16,8 @@ COMMODITIES = {
     "natural_gas": "NG=F",
     "gold": "GC=F",
     "silver": "SI=F",
+    "all_comodoties_index":"GSG",
+    "dollar index":"DX-Y.NYB"
 }
 
 
@@ -25,7 +27,7 @@ HEADERS = {
 }
 
 
-def explore_commodity(ticker: str, interval: str = "1h", d_range: str = "7d"):
+def explore_commodity(ticker: str, interval: str = "1m", d_range: str = "1d"):
     """
     This function takes a commodity name and its ticker as arguments, 
     sends a GET request to the Yahoo Finance API to retrieve the 
@@ -54,6 +56,7 @@ def explore_commodity(ticker: str, interval: str = "1h", d_range: str = "7d"):
             
         except Exception as e:
             logging.exception(f"Error processing {ticker}: {e}")
+            
         
     
     # if the request was not successful   
@@ -64,7 +67,7 @@ def explore_commodity(ticker: str, interval: str = "1h", d_range: str = "7d"):
 if __name__ == "__main__":
     all_data = []     
     for name, ticker in COMMODITIES.items():
-        timestamp, closes = explore_commodity(ticker)
+        timestamp, closes = explore_commodity(ticker, "1m", "1d")
         closes = [round(c, 4) if c is not None else None for c in closes]
         for ts, c in zip(timestamp, closes):
             new_timestamp = datetime.fromtimestamp(ts)  
@@ -73,7 +76,7 @@ if __name__ == "__main__":
                 "commodity": name,
                 "ticker": ticker,
                 "timestamp": new_timestamp,
-                "closes": c
+                "close": c
                 })
 
     df = pd.DataFrame(all_data)
