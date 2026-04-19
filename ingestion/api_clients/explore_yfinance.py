@@ -27,7 +27,7 @@ HEADERS = {
 }
 
 
-def explore_commodity(ticker: str, interval: str = "1m", d_range: str = "1d"):
+def explore_commodity(ticker: str, interval: str = "1m", d_range: str = "3d"):
     """
     This function takes a commodity name and its ticker as arguments, 
     sends a GET request to the Yahoo Finance API to retrieve the 
@@ -56,18 +56,26 @@ def explore_commodity(ticker: str, interval: str = "1m", d_range: str = "1d"):
             
         except Exception as e:
             logging.exception(f"Error processing {ticker}: {e}")
+            return None 
             
         
     
     # if the request was not successful   
     else:
         logging.error(f"Error fetching data for {ticker}: {response.status_code}")
+        return None 
         
 # loop over the commodities
 if __name__ == "__main__":
     all_data = []     
     for name, ticker in COMMODITIES.items():
-        timestamp, closes = explore_commodity(ticker, "1m", "1d")
+        result = explore_commodity(ticker, "1m", "7d")
+        
+        if result is None:
+            print(f"❌ Skipping {name} - failed to fetch")
+            continue
+            
+        timestamp, closes = result
         closes = [round(c, 4) if c is not None else None for c in closes]
         for ts, c in zip(timestamp, closes):
             new_timestamp = datetime.fromtimestamp(ts)  
