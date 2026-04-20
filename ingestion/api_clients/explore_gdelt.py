@@ -11,6 +11,7 @@ import io
 import zipfile
 import time
 import sys
+from urllib.parse import urlparse
 
 # Configure logging - file only, no console output
 logging.basicConfig(
@@ -22,6 +23,55 @@ logging.basicConfig(
 logging.info("=" * 60)
 logging.info("GDELT EXPLORATION STARTED")
 logging.info("=" * 60)
+
+# ============================================================================
+# HELPER FUNCTIONS FOR URL PROCESSING
+# ============================================================================
+
+def extract_description(url):
+    """
+    Extracts the last part of the URL path to use as a description.
+    Example: https://.../a/b/c -> returns 'c'
+    """
+    if pd.isna(url) or not isinstance(url, str):
+        return None
+    try:
+        parsed = urlparse(url)
+        path = parsed.path
+        if path.endswith('/'):
+            path = path[:-1]
+        description = path.split('/')[-1]
+        return description if description else None
+    except Exception:
+        return None
+
+# Define excluded sources (EDIT THIS LIST AS NEEDED)
+EXCLUDED_SOURCES = [
+    'pagesix.com',
+    'dailymail.co.uk',
+    'tmz.com',
+    'people.com',
+    'eonline.com',
+    'usmagazine.com',
+    'justjared.com',
+    'nypost.com',
+    'dailystar.co.uk',
+    'thesun.co.uk'
+]
+
+def is_source_excluded(url):
+    """
+    Returns True if the URL's domain is in the exclusion list.
+    """
+    if pd.isna(url) or not isinstance(url, str):
+        return False
+    try:
+        domain = urlparse(url).netloc.lower()
+        if domain.startswith('www.'):
+            domain = domain[4:]
+        return any(excluded in domain for excluded in EXCLUDED_SOURCES)
+    except Exception:
+        return False
 
 # ============================================================================
 # STEP 1: Fetch the master file list
@@ -131,17 +181,22 @@ COL_DATEADDED = 59
 COL_SOURCEURL = 60
 
 # ============================================================================
-# STEP 6: Define major event codes that impact commodity prices
+# STEP 6: Define HIGH IMPACT event codes that move commodity prices
 # ============================================================================
 
-# MAJOR CONFLICT & WAR (Price UP)
-major_conflict_codes = [
+# Conventional war (Price UP)
+conventional_war_codes = [
     '190',  # Use conventional military force
     '191',  # Impose blockade, restrict movement
     '192',  # Occupy territory
+    '193',  # Fight with small arms and light weapons
     '194',  # Fight with artillery and tanks
     '195',  # Employ aerial weapons
     '196',  # Violate ceasefire
+]
+
+# Unconventional mass violence (Price UP)
+mass_violence_codes = [
     '200',  # Use unconventional mass violence
     '201',  # Engage in mass expulsion
     '202',  # Engage in mass killings
@@ -149,78 +204,51 @@ major_conflict_codes = [
     '204'   # Use weapons of mass destruction
 ]
 
-# MAJOR TERROR (Price UP)
-major_terror_codes = [
-    '186'   # Assassination (of political leader)
+# Terror and violence (Price UP)
+terror_codes = [
+    '180',  # Use unconventional violence
+    '181',  # Abduct, hijack, or take hostage
+    '182',  # Physically assault
+    '183',  # Conduct bombing
+    '186'   # Assassinate
 ]
 
-# MAJOR SANCTIONS (Price UP)
-major_sanctions_codes = [
-    '163'   # Impose embargo, boycott, or sanctions
+# Sanctions and economic warfare (Price UP)
+sanctions_codes = [
+    '161',  # Reduce or break diplomatic relations
+    '163',  # Impose embargo, boycott, or sanctions
+    '164'   # Halt negotiations
 ]
 
-# MAJOR THREATS (Price UP)
-major_threat_codes = [
-    '138',  # Threaten with military force
-    '139'   # Give ultimatum
-]
-
-# MAJOR PROTEST (Price UP - only violent)
-major_protest_codes = [
-    '145'   # Violent protest, riot
-]
-
-# MAJOR COOPERATION (Price DOWN)
-major_cooperation_codes = [
+# Peace and cooperation (Price DOWN)
+peace_codes = [
     '057',  # Sign formal agreement (peace treaty)
     '085',  # Ease economic sanctions
     '087'   # De-escalate military engagement
 ]
 
-# ADDITIONAL VIOLENCE CODES (Medium impact)
-additional_violence_codes = [
-    '182',  # Physically assault
-    '183',  # Conduct bombing
-    '185'   # Attempt to assassinate
-]
-
-# ADDITIONAL COOPERATION CODES (Low impact)
-additional_cooperation_codes = [
-    '021',  # Appeal for economic cooperation
-    '031',  # Express intent to cooperate
-    '033',  # Express intent to provide aid
-    '041',  # Discuss by telephone
-    '045',  # Mediate
-    '051',  # Praise or endorse
-    '061',  # Cooperate economically
-    '071',  # Provide economic aid
-    '074',  # Provide military protection
-    '081'   # Ease administrative sanctions
-]
-
-# Combine all relevant codes for exploration
-relevant_codes = (
-    major_conflict_codes + major_terror_codes + major_sanctions_codes +
-    major_threat_codes + major_protest_codes + major_cooperation_codes +
-    additional_violence_codes + additional_cooperation_codes
+# Combine all high-impact codes
+high_impact_codes = (
+    conventional_war_codes + mass_violence_codes + 
+    terror_codes + sanctions_codes + peace_codes
 )
 
-logging.info(f"Total relevant event codes: {len(relevant_codes)}")
-logging.info(f"Codes: {relevant_codes}")
+logging.info(f"Total high-impact event codes: {len(high_impact_codes)}")
+logging.info(f"Codes: {high_impact_codes}")
 
 # ============================================================================
-# STEP 7: Filter for relevant events (NO thresholds for exploration)
+# STEP 7: Filter for high-impact events
 # ============================================================================
 event_codes = df[COL_EVENT_CODE].astype(str)
-mask = event_codes.isin(relevant_codes)
+mask = event_codes.isin(high_impact_codes)
 
 filtered_df = df[mask]
-logging.info(f"Filtered to {len(filtered_df)} relevant events")
+logging.info(f"Filtered to {len(filtered_df)} high-impact events")
 
 if len(filtered_df) > 0:
     logging.info(f"Unique EventCodes found: {sorted(filtered_df[COL_EVENT_CODE].unique())}")
 else:
-    logging.warning("No relevant events found in this file")
+    logging.warning("No high-impact events found in this file")
     logging.info("=" * 60)
     logging.info("GDELT EXPLORATION COMPLETED - NO EVENTS")
     logging.info("=" * 60)
@@ -257,27 +285,44 @@ final_df.columns = [
 ]
 
 # ============================================================================
+# STEP 8.5: Apply source filtering and add description
+# ============================================================================
+
+# Remove excluded sources
+before_filter_count = len(final_df)
+final_df = final_df[~final_df['SOURCEURL'].apply(is_source_excluded)]
+after_filter_count = len(final_df)
+logging.info(f"Removed {before_filter_count - after_filter_count} events from excluded sources")
+
+# Add description column (extracted from URL)
+final_df['Description'] = final_df['SOURCEURL'].apply(extract_description)
+logging.info(f"Added Description column from URL")
+
+# ============================================================================
+# STEP 8.6: Deduplicate by SOURCEURL
+# ============================================================================
+
+before_dedupe = len(final_df)
+final_df = final_df.drop_duplicates(subset=['SOURCEURL'], keep='first')
+after_dedupe = len(final_df)
+logging.info(f"Deduplicated by SOURCEURL: removed {before_dedupe - after_dedupe} duplicate URLs")
+
+# ============================================================================
 # STEP 9: Categorize events
 # ============================================================================
 def categorize_event(code):
     code_str = str(code)
     
-    if code_str in major_conflict_codes:
-        return 'Conflict_War'
-    elif code_str in major_terror_codes:
-        return 'Terror_Assassination'
-    elif code_str in major_sanctions_codes:
-        return 'Sanctions_Embargo'
-    elif code_str in major_threat_codes:
-        return 'Military_Threat'
-    elif code_str in major_protest_codes:
-        return 'Violent_Protest'
-    elif code_str in major_cooperation_codes:
+    if code_str in conventional_war_codes:
+        return 'Conventional_War'
+    elif code_str in mass_violence_codes:
+        return 'Mass_Violence'
+    elif code_str in terror_codes:
+        return 'Terror_Violence'
+    elif code_str in sanctions_codes:
+        return 'Sanctions'
+    elif code_str in peace_codes:
         return 'Peace_Deescalation'
-    elif code_str in additional_violence_codes:
-        return 'Violence_Other'
-    elif code_str in additional_cooperation_codes:
-        return 'Cooperation_Other'
     else:
         return 'Other'
 
@@ -309,7 +354,7 @@ logging.info(f"Saved to {output_file}")
 logging.info("=" * 60)
 logging.info("SUMMARY STATISTICS")
 logging.info("=" * 60)
-logging.info(f"Total relevant events: {len(final_df)}")
+logging.info(f"Total high-impact events: {len(final_df)}")
 logging.info(f"Date range: {final_df['SQLDATE'].min()} to {final_df['SQLDATE'].max()}")
 logging.info("Event category counts:")
 for category, count in final_df['EventCategory'].value_counts().items():
@@ -322,7 +367,7 @@ for country, count in final_df['Actor1CountryCode'].value_counts().head(5).items
 
 logging.info("Sample events (first 10):")
 for i in range(min(10, len(final_df))):
-    logging.info(f"  {final_df['EventCode'].iloc[i]} - {final_df['EventCategory'].iloc[i]} - {final_df['ActionGeo_FullName'].iloc[i]} (Mentions: {final_df['NumMentions'].iloc[i]})")
+    logging.info(f"  {final_df['EventCode'].iloc[i]} - {final_df['EventCategory'].iloc[i]} - {final_df['Description'].iloc[i]} (Mentions: {final_df['NumMentions'].iloc[i]})")
 
 logging.info("=" * 60)
 logging.info("GDELT EXPLORATION COMPLETED SUCCESSFULLY")

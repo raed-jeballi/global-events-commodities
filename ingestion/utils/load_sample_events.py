@@ -40,12 +40,12 @@ try:
             globaleventid, sqldate, eventcode, eventrootcode, goldsteinscale,
             nummentions, numsources, avgtone, actor1name, actor1countrycode,
             actor2name, actor2countrycode, actiongeo_fullname, dateadded,
-            sourceurl, eventcategory, source_file, ingested_at
+            description, sourceurl, eventcategory, source_file, ingested_at
         )
         FROM (
             SELECT 
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, $16, 'sample_gdelt_events.csv', CURRENT_TIMESTAMP()
+                $11, $12, $13, $14, $16, $15, $17, 'sample_gdelt_events.csv', CURRENT_TIMESTAMP()
             FROM @my_stage/sample_gdelt_events.csv
         )
         FILE_FORMAT = (

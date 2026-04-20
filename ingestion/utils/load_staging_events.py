@@ -45,6 +45,7 @@ try:
             MIN(actor2countrycode) as actor2countrycode,
             MIN(actiongeo_fullname) as actiongeo_fullname,
             MIN(dateadded) as dateadded,
+            MIN(description) as description,
             sourceurl,
             MIN(eventcategory) as eventcategory,
             MIN(source_file) as source_file,
