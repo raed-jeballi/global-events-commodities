@@ -179,81 +179,92 @@ COL_ACTOR2_COUNTRY = 17
 COL_ACTION_GEO = 43
 COL_DATEADDED = 59
 COL_SOURCEURL = 60
-
 # ============================================================================
 # STEP 6: Define HIGH IMPACT event codes that move commodity prices
+# (Use integers instead of strings)
 # ============================================================================
 
 # Conventional war (Price UP)
 conventional_war_codes = [
-    '190',  # Use conventional military force
-    '191',  # Impose blockade, restrict movement
-    '192',  # Occupy territory
-    '193',  # Fight with small arms and light weapons
-    '194',  # Fight with artillery and tanks
-    '195',  # Employ aerial weapons
-    '196',  # Violate ceasefire
+    190, 191, 192, 193, 194, 195, 196
 ]
 
 # Unconventional mass violence (Price UP)
 mass_violence_codes = [
-    '200',  # Use unconventional mass violence
-    '201',  # Engage in mass expulsion
-    '202',  # Engage in mass killings
-    '203',  # Engage in ethnic cleansing
-    '204'   # Use weapons of mass destruction
+    200, 201, 202, 203, 204
 ]
 
 # Terror and violence (Price UP)
 terror_codes = [
-    '180',  # Use unconventional violence
-    '181',  # Abduct, hijack, or take hostage
-    '182',  # Physically assault
-    '183',  # Conduct bombing
-    '186'   # Assassinate
+    180, 181, 182, 183, 186
 ]
 
 # Sanctions and economic warfare (Price UP)
 sanctions_codes = [
-    '161',  # Reduce or break diplomatic relations
-    '163',  # Impose embargo, boycott, or sanctions
-    '164'   # Halt negotiations
+    161, 163, 164
 ]
 
 # Peace and cooperation (Price DOWN)
 peace_codes = [
-    '057',  # Sign formal agreement (peace treaty)
-    '085',  # Ease economic sanctions
-    '087'   # De-escalate military engagement
+    57, 85, 87
 ]
 
 # Combine all high-impact codes
 high_impact_codes = (
-    conventional_war_codes + mass_violence_codes + 
-    terror_codes + sanctions_codes + peace_codes
+    conventional_war_codes +
+    mass_violence_codes +
+    terror_codes +
+    sanctions_codes +
+    peace_codes
 )
 
 logging.info(f"Total high-impact event codes: {len(high_impact_codes)}")
 logging.info(f"Codes: {high_impact_codes}")
 
 # ============================================================================
-# STEP 7: Filter for high-impact events
+# STEP 7: Filter for relevant events with numeric thresholds
 # ============================================================================
-event_codes = df[COL_EVENT_CODE].astype(str)
-mask = event_codes.isin(high_impact_codes)
 
-filtered_df = df[mask]
-logging.info(f"Filtered to {len(filtered_df)} high-impact events")
+# Convert EventCode safely to numeric
+event_codes = pd.to_numeric(
+    df[COL_EVENT_CODE],
+    errors='coerce'
+)
 
-if len(filtered_df) > 0:
-    logging.info(f"Unique EventCodes found: {sorted(filtered_df[COL_EVENT_CODE].unique())}")
-else:
-    logging.warning("No high-impact events found in this file")
-    logging.info("=" * 60)
-    logging.info("GDELT EXPLORATION COMPLETED - NO EVENTS")
-    logging.info("=" * 60)
+# Filter by high-impact event codes
+code_mask = event_codes.isin(high_impact_codes)
+
+code_filtered_df = df[code_mask]
+
+logging.info(f"Step 7a - Code filter: {len(code_filtered_df)} events")
+
+if len(code_filtered_df) > 0:
+    unique_codes = sorted(
+        pd.to_numeric(
+            code_filtered_df[COL_EVENT_CODE],
+            errors='coerce'
+        ).dropna().astype(int).unique()
+    )
+    logging.info(f"Unique EventCodes after code filter: {unique_codes}")
+
+if len(code_filtered_df) == 0:
+    logging.warning("No events match the high-impact codes")
     sys.exit(0)
 
+# Apply numeric thresholds
+numeric_mask = (
+    (code_filtered_df[COL_NUM_MENTIONS] >= 1) &
+    (code_filtered_df[COL_NUM_SOURCES] >= 1) &
+    (abs(code_filtered_df[COL_GOLDSTEIN]) >= 1)
+)
+
+filtered_df = code_filtered_df[numeric_mask]
+
+logging.info(f"Final filtered: {len(filtered_df)} events")
+
+if len(filtered_df) == 0:
+    logging.warning("No events passed the numeric thresholds")
+    sys.exit(0)
 # ============================================================================
 # STEP 8: Select relevant columns
 # ============================================================================
@@ -296,7 +307,7 @@ logging.info(f"Removed {before_filter_count - after_filter_count} events from ex
 
 # Add description column (extracted from URL)
 final_df['Description'] = final_df['SOURCEURL'].apply(extract_description)
-logging.info(f"Added Description column from URL")
+logging.info("Added Description column from URL")
 
 # ============================================================================
 # STEP 8.6: Deduplicate by SOURCEURL
@@ -308,21 +319,41 @@ after_dedupe = len(final_df)
 logging.info(f"Deduplicated by SOURCEURL: removed {before_dedupe - after_dedupe} duplicate URLs")
 
 # ============================================================================
+# STEP 8.7: Add is_global_event flag
+# ============================================================================
+
+final_df['is_global_event'] = (
+    (final_df['NumMentions'] >= 20) &
+    (final_df['NumSources'] >= 5) &
+    (abs(final_df['GoldsteinScale']) >= 5) &
+    (final_df['Actor1CountryCode'].notna()) &
+    (final_df['Actor1CountryCode'] != '')
+)
+
+# ============================================================================
 # STEP 9: Categorize events
 # ============================================================================
 def categorize_event(code):
-    code_str = str(code)
-    
-    if code_str in conventional_war_codes:
+    try:
+        code_int = int(float(code))
+    except:
+        return 'Other'
+
+    if code_int in conventional_war_codes:
         return 'Conventional_War'
-    elif code_str in mass_violence_codes:
+
+    elif code_int in mass_violence_codes:
         return 'Mass_Violence'
-    elif code_str in terror_codes:
+
+    elif code_int in terror_codes:
         return 'Terror_Violence'
-    elif code_str in sanctions_codes:
+
+    elif code_int in sanctions_codes:
         return 'Sanctions'
-    elif code_str in peace_codes:
+
+    elif code_int in peace_codes:
         return 'Peace_Deescalation'
+
     else:
         return 'Other'
 
